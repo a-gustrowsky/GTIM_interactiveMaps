@@ -9,6 +9,8 @@ library(leaflet)
 library(stringr)
 library(htmlwidgets)
 
+census_api_key("f77277701b9aea26b28163c74fc3802901945257", install=TRUE, overwrite=TRUE)
+
 ACS<-load_variables(2020,
                     "acs5",
                     cache=FALSE)

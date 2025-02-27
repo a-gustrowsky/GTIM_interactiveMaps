@@ -1,0 +1,84 @@
+setwd("C:/Users/Alivia Gustrowsky/Documents/Alivia's Docs/school/MSU/S25/GTIM/EXERCISE4")
+
+library(tidyverse)
+library(tidycensus)
+library(ggplot2)
+library(Hmisc)
+library(sf)
+library(leaflet)
+library(stringr)
+library(htmlwidgets)
+
+ACS<-load_variables(2020,
+                    "acs5",
+                    cache=FALSE)
+  
+Variables<-c(MHI = "B19013_001",
+             MHV = "B25077_001",
+             Totalpop = "B01003_001")
+
+statesACT <- get_acs(geography="state",
+                     variables=Variables,
+                     survey="acs5",
+                     year=2020,
+                     output="wide",
+                     geometry=T)
+  
+statesData<-statesACT[,c("GEOID", "NAME", "MHIE", "MHVE", "TotalpopE", "geometry")]
+names(statesData)[names(statesData) == "MHIE"] <- "MHI"
+names(statesData)[names(statesData) == "MHVE"] <- "MHV"
+names(statesData)[names(statesData) == "TotalpopE"] <- "Totalpop"
+
+statesPalMHI <- colorQuantile(palette = "mako", domain=statesData$MHI, n=10)
+statesPalMHV <- colorQuantile(palette = "inferno", domain=statesData$MHV, n=10)
+statesPalTpop <- colorQuantile(palette = "viridis", domain=statesData$TotalPop, n=10)
+
+statesMap <- statesData%>%
+  st_transform(crs = "+init=epsg:4326")%>%
+  leaflet()%>%
+  setView(lng = -98.55, lat = 39.8098, zoom = 3)%>%
+  addTiles(group = "OSM (default)")%>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Carto B")%>%
+  addPolygons(group = "Total",
+              popup = paste("State: ", statesData$NAME, "<br>",
+                            "Total Population: ", statesData$Totalpop, "<br>", #may throw naming error
+                            "Median Household Income: ", "$", statesData$MHI, "<br>",
+                            "Median Home Value: ", "$", statesData$MHV, "<br>"),
+              stroke = FALSE,
+              smoothFactor = 0,
+              fillOpacity = 0.7,
+              color = ~ statesPalTpop(Totalpop)) %>% 
+  addLegend(position = "bottomleft", pal=statesPalTpop, values= statesData$Totalpop,
+            title="Percentile of State Total Population", group = "Total", opacity = 1) %>% 
+  addPolygons(group = "MHI",
+              popup = paste("State: ", statesData$NAME, "<br>",
+                            "Total Population: ", statesData$Totalpop, "<br>",
+                            "Median Household Income: ", "$", statesData$MHI, "<br>",
+                            "Median Home Value: ", "$", statesData$MHV, "<br>"),
+              stroke = FALSE,
+              smoothFactor = 0,
+              fillOpacity = 0.7,
+              color = ~ statesPalMHI(MHI)) %>%
+  addLegend(position = "bottomright", pal=statesPalMHI, values= statesData$MHI, 
+            title="Percentile of State Median Household Income", group = "MHI", opacity = 1) %>% 
+  addPolygons(group = "MHV",
+              popup = paste("State: ", statesData$NAME, "<br>",
+                            "Total Population: ", statesData$Totalpop, "<br>",
+                            "Median Household Income: ", "$", statesData$MHI, "<br>",
+                            "Median Home Value: ", "$", statesData$MHV, "<br>"),
+              stroke = FALSE,
+              smoothFactor = 0,
+              fillOpacity = 0.7,
+              color = ~ statesPalMHV(MHV)) %>%
+  addLegend(position = "bottomleft", pal=statesPalMHV, values= statesData$MHV, 
+            title="Percentile of State Median Household Income", group = "MHV", opacity = 1) %>%
+  hideGroup("MHI") %>%
+  hideGroup("MHV") %>%
+  addLayersControl(
+    baseGroups = c("OSM (default)", "Carto B"),
+    overlayGroups = c("Total", "MHI", "MHV"),
+    options = layersControlOptions(collapsed = FALSE))
+
+statesMap
+
+saveWidget(statesMap, file="StatesMap.html", selfcontained = T)
